@@ -10,6 +10,11 @@ import {
 import { confirmPrompt, log } from '../util'
 
 export async function rename(name: string, newName: string, options: { confirm?: true }) {
+	if (name === newName) {
+		log().yellow('The new name is the same as the current name! No changes made.\n')
+		process.exit(0)
+	}
+
 	validateEnvironmentName(newName)
 	if (!(await environmentExists(name))) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)

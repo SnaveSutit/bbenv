@@ -1,14 +1,19 @@
 import { compare } from 'compare-versions'
+import { createHash } from 'crypto'
+import got from 'got'
 import { spawn } from 'node:child_process'
-import { mkdir, readdir, unlink, writeFile } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { chmod, mkdir, readdir, readFile, unlink } from 'node:fs/promises'
 import { join, parse } from 'node:path'
-import { arch, platform } from 'os'
+import { pipeline as streamPipeline } from 'node:stream/promises'
+import { platform } from 'os'
 import { terminal as $ } from 'terminal-kit'
+import yaml from 'yaml'
 import { getEnvironmentFiles, validateBlockbenchLaunchArgs } from './environmentHandler'
 import { exists } from './fileUtil'
-import { customSpinner, isOnline, log } from './util'
+import { formatBytes, isOnline, log } from './util'
 
-const RELEASES_API_URL = 'https://api.github.com/repos/JannisX11/Blockbench/releases'
+const RELEASES_API_URL = 'http://api.github.com/repos/JannisX11/Blockbench/releases'
 const RELEASE_TAGS_URL = RELEASES_API_URL + '/tags'
 const LATEST_RELEASE_URL = RELEASES_API_URL + '/latest'
 const MINIMUM_BLOCKBENCH_VERSION: ResolvedBlockbenchVersion = '4.10.0'
@@ -20,23 +25,31 @@ function getNameProvider() {
 	switch (platform()) {
 		case 'win32':
 			return (version: ResolvedBlockbenchVersion) => [
-				`https://github.com/JannisX11/blockbench/releases/download/v${version}/Blockbench_${version}_portable.exe`,
+				`http://github.com/JannisX11/blockbench/releases/download/v${version}/Blockbench_${version}_portable.exe`,
 				`blockbench-${version}.exe`,
 			]
 		case 'darwin':
 			return (version: ResolvedBlockbenchVersion) => [
-				`https://github.com/JannisX11/blockbench/releases/download/v${version}/Blockbench_${arch}_${version}.dmg`,
+				`http://github.com/JannisX11/blockbench/releases/download/v${version}/Blockbench_${version}.dmg`,
 				`blockbench-${version}.dmg`,
 			]
 		case 'linux':
-		default:
 			return (version: ResolvedBlockbenchVersion) => [
-				`https://github.com/JannisX11/blockbench/releases/download/v${version}/Blockbench_${arch}_${version}.AppImage`,
+				`http://github.com/JannisX11/blockbench/releases/download/v${version}/Blockbench_${version}.AppImage`,
 				`blockbench-${version}.AppImage`,
 			]
+		default:
+			$.red(`Unsupported platform: ${platform()}\n`)
+			process.exit(1)
 	}
 }
 const urlProvider = getNameProvider()
+
+async function getLinuxManifest(version: ResolvedBlockbenchVersion) {
+	const url = `http://github.com/JannisX11/blockbench/releases/download/v${version}/latest-linux.yml`
+	const yml = (await got(url)).body
+	return yaml.parse(yml)
+}
 
 export async function resolveVersion(version: NamedBlockbenchVersion) {
 	if (version === undefined) {
@@ -68,25 +81,53 @@ async function downloadNewPortableBlockbench(version: ResolvedBlockbenchVersion)
 	}
 	const target = getPortablePath(version)
 	const [url] = urlProvider(version)
-	await customSpinner({
-		style: $.cyan,
-		prefix: log,
-		suffix: $.cyan.bindArgs(` Downloading Blockbench ${version}...`),
-		async waitFor() {
-			const res = await fetch(url)
-			if (!res.ok) {
-				log().error.red(
-					`Failed to download Blockbench ${version}: The requested version does not include a portable executable, therefore envbench cannot safely isolate it.\n`
-				)
-				throw new Error(
-					`Failed to download Blockbench ${version} from ${url}: ${res.statusText}`
-				)
-			}
-			await mkdir(parse(target).dir, { recursive: true })
-			await writeFile(target, Buffer.from(await res.arrayBuffer()))
-		},
+
+	// Progress bar prefix
+	$.gray('[').blue('EnvBench').gray('] ').cyan(`Downloading Blockbench ${version}... \n`)
+
+	const progressBar = $.progressBar({
+		title: `0000.00MB / 0000.00MB`,
+		titleStyle: $.cyan,
+		barBracketStyle: $.gray,
+		barChar: '#',
+		barHeadChar: '#',
+		barStyle: $.green,
+		minRefreshTime: 250,
 	})
-	log().green('Blockbench downloaded successfully!\n')
+
+	await mkdir(parse(target).dir, { recursive: true })
+
+	try {
+		await streamPipeline(
+			got.stream(url).on('downloadProgress', progress => {
+				progressBar.update({
+					progress: progress.percent,
+					title: `${formatBytes(progress.transferred)} / ${formatBytes(progress.total ?? 0)}`,
+				})
+			}),
+			createWriteStream(target)
+		)
+	} catch (err: any) {
+		log().red(`Failed to download Blockbench ${version}:\n`, err.message, '\n')
+		process.exit(1)
+	}
+
+	progressBar.stop()
+	$('\n')
+
+	if (!(await verifyInstalledVersion(version))) {
+		log().red(
+			`The downloaded version of Blockbench ${version} appears to be corrupted (failed integrity check). Please try installing again.\n`
+		)
+		await unlink(target)
+		process.exit(1)
+	}
+
+	if (platform() === 'linux') {
+		await chmod(target, 0o755) // Make the file executable
+	}
+
+	log().green('Blockbench downloaded successfully.\n')
 
 	return target
 }
@@ -145,6 +186,35 @@ async function isVersionInstalled(version: NamedBlockbenchVersion) {
 	return false
 }
 
+async function verifyInstalledVersion(version: NamedBlockbenchVersion) {
+	version = await resolveVersion(version)
+
+	const blockbenchPath = getPortablePath(version)
+
+	if (!blockbenchPath.endsWith('.AppImage')) {
+		return true
+	}
+
+	const manifest = await getLinuxManifest(version)
+
+	const hash = createHash('sha512')
+		.update(await readFile(blockbenchPath))
+		.digest('base64')
+
+	if (hash !== manifest.sha512) {
+		log()
+			.red(
+				`Blockbench ${version} failed integrity check! The file may be corrupted.\n  Expected: `
+			)
+			.green(manifest.sha512)
+			.red(`\n  Actual:   `)
+			.yellow(hash)(`\n`)
+		return false
+	}
+
+	return true
+}
+
 export async function installVersion(
 	version: NamedBlockbenchVersion,
 	ignoreAlreadyInstalledError = true
@@ -167,14 +237,18 @@ export async function launchBlockbench(
 ) {
 	const resolvedVersion = await resolveVersion(version)
 
+	const blockbenchPath = getPortablePath(resolvedVersion)
+
 	if (!(await isVersionInstalled(version))) {
 		await downloadNewPortableBlockbench(resolvedVersion)
 	}
 
-	let blockbenchPath = process.env.BLOCKBENCH_PATH
-	const latest = await resolveVersion('latest')
-	if (version !== latest) {
-		blockbenchPath = getPortablePath(resolvedVersion)
+	if (!(await verifyInstalledVersion(version))) {
+		log().red(
+			`The installed version of Blockbench ${version} appears to be corrupted (failed integrity check). Reinstalling...\n`
+		)
+		await unlink(blockbenchPath)
+		await downloadNewPortableBlockbench(resolvedVersion)
 	}
 
 	validateBlockbenchLaunchArgs(args)
@@ -188,7 +262,7 @@ export async function launchBlockbench(
 				process.exit(1)
 			})
 			.on('spawn', () => {
-				log().green('Blockbench launched successfully\n')
+				log().green('Blockbench launched successfully.\n')
 			})
 			.on('exit', code => {
 				if (code === 0) {
@@ -198,7 +272,7 @@ export async function launchBlockbench(
 				}
 			})
 			.on('close', () => {
-				log().green('Blockbench closed\n')
+				log().green('Blockbench closed.\n')
 				resolve()
 			})
 		bb.stdout.on('data', data => {

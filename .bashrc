@@ -1,0 +1,1 @@
+alias envbench='node ./dist/envbench.js'

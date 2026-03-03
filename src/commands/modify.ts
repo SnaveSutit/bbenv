@@ -19,19 +19,28 @@ export async function modify(
 		version?: NamedBlockbenchVersion
 	}
 ) {
+	if (Object.keys(options).length === 0) {
+		log().yellow('No modifications specified! Use --help for usage information.\n')
+		process.exit(1)
+	}
+
 	if (!(await environmentExists(name))) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 		process.exit(1)
 	}
+
 	if (!options.force) {
 		log()
 			.yellow(`Are you sure you want to modify the environment `)
 			.cyan(name)
 			.yellow(` with the following changes?\n`)
-		if (options.launchArgs) {
+		if (options.launchArgs !== undefined) {
 			log().yellow(`- Launch arguments: `).cyan(options.launchArgs).yellow(`\n`)
 		}
-		if (options.rename) {
+		if (options.version !== undefined) {
+			log().yellow(`- Blockbench version: `).cyan(options.version).yellow(`\n`)
+		}
+		if (options.rename !== undefined) {
 			log().yellow(`- Rename to `).cyan(options.rename).yellow(`\n`)
 		}
 		log().yellow(`Confirm? [y/n]\n`)
@@ -44,7 +53,7 @@ export async function modify(
 	log().green(`Modifying Environment `).cyan(name).green(`...\n`)
 	const envFile = await getEnvironmentFile(name)
 
-	if (options.launchArgs) {
+	if (options.launchArgs !== undefined) {
 		log()
 			.green(`Setting launch arguments for `)
 			.cyan(name)
@@ -56,7 +65,7 @@ export async function modify(
 		envFile.launchArgs = args
 	}
 
-	if (options.version) {
+	if (options.version !== undefined) {
 		log()
 			.green(`Setting Blockbench version for `)
 			.cyan(name)
@@ -69,9 +78,11 @@ export async function modify(
 	await setEnvironmentFile(name, envFile)
 	log().green(`Environment `).cyan(name).green(` modified successfully!\n`)
 
-	if (options.rename) {
+	if (options.rename !== undefined) {
 		await rename(name, options.rename, { confirm: true })
 	}
+
+	process.exit(0)
 }
 
 registerCommand(program => {

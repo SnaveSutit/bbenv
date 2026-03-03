@@ -16,14 +16,15 @@ export async function blockbenchVersions(options: { prune?: true }) {
 		process.env.BLOCKBENCH_PORTABLES_CACHE
 	)) as PortableFileName[]
 	for (const portable of portableFiles) {
-		const version = portable.replace(/^blockbench-|\.exe|\.dmg|\.AppImage$/g, '')
+		const version = portable.replace(/^blockbench(?:-|_)|\.exe|\.dmg|\.AppImage$/gi, '')
 		log().cyan(version).green(` (${portable})\n`)
 	}
 }
 
 registerCommand(program => {
 	program
-		.command('blockbench_versions')
+		.command('blockbench-versions')
+		.alias('bb-versions')
 		.usage('[options]')
 		.description('list the locally installed versions of Blockbench')
 		.option(

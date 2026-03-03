@@ -91,3 +91,17 @@ export function customSpinner<T extends any>({
 		})
 	})
 }
+
+export function formatBytes(bytes: number): string {
+	return (bytes / (1024 * 1024)).toFixed(2) + 'MB'
+}
+
+const LAUNCH_ARG_REGEX = /(".+?"|'.+?'|[^ =]+)+/g
+
+export function parseBlockbenchLaunchArgs(strArgs: string): string[] {
+	const matches = strArgs.match(LAUNCH_ARG_REGEX)
+	if (!matches) {
+		return []
+	}
+	return matches.slice()
+}
