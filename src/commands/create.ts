@@ -81,6 +81,7 @@ export async function create(
 	)
 
 	log().green('Environment created successfully!\n')
+	process.exit(0)
 }
 
 registerCommand(program => {

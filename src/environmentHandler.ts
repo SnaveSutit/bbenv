@@ -6,6 +6,8 @@ import { NamedBlockbenchVersion } from './blockbenchVersionManager'
 import { exists, readdirSafe } from './fileUtil'
 import { log } from './util'
 
+const ENVIRONMENT_FILE_NAME = '.envbench.json'
+
 interface EnvironmentFile {
 	name: string
 	envbench_version: string
@@ -41,7 +43,7 @@ export async function environmentExists(
 		return false
 	}
 	const environmentFileExists = await exists(
-		join(process.env.ENVBENCH_STORAGE_FOLDER, name, process.env.ENVBENCH_ENVIRONMENT_FILE)
+		join(process.env.ENVBENCH_STORAGE_FOLDER, name, ENVIRONMENT_FILE_NAME)
 	)
 	if (folderExists && !environmentFileExists) {
 		if (showWarning) {
@@ -63,7 +65,7 @@ export async function setEnvironmentFile(name: string, data: EnvironmentFile, fo
 		throw new EnvironmentError(`Environment ${name} does not exist!`)
 	}
 	return await writeFile(
-		join(path, process.env.ENVBENCH_ENVIRONMENT_FILE),
+		join(path, ENVIRONMENT_FILE_NAME),
 		JSON.stringify(data, null, '\t')
 	).catch(err => {
 		log().red(`Failed to write environment file:\n`)
@@ -77,7 +79,7 @@ export async function getEnvironmentFile(name: string): Promise<EnvironmentFile>
 	if (!(await environmentExists(name, true))) {
 		throw new EnvironmentError(`Environment ${name} does not exist!`)
 	}
-	return await readFile(join(path, process.env.ENVBENCH_ENVIRONMENT_FILE), 'utf-8')
+	return await readFile(join(path, ENVIRONMENT_FILE_NAME), 'utf-8')
 		.then(content => {
 			const json = JSON.parse(content) as EnvironmentFile
 			// Validate the environment file

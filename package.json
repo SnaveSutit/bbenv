@@ -25,10 +25,12 @@
 		"lint": "eslint ."
 	},
 	"devDependencies": {
+		"@types/got": "^9.6.12",
 		"@types/node": "^22.5.5",
 		"compare-versions": "^6.1.1",
 		"esbuild-plugin-import-glob": "^0.1.1",
 		"eslint": "^9.20.0",
+		"got": "^14.6.6",
 		"jiti": "^2.4.2",
 		"node-modules-vscode-problems-patch": "^1.0.9",
 		"tsx": "^4.19.3",
@@ -41,7 +43,8 @@
 		"commander": "^13.1.0",
 		"strip-ansi": "^7.1.0",
 		"terminal-kit": "^3.1.1",
-		"wrap-ansi": "^9.0.0"
+		"wrap-ansi": "^9.0.0",
+		"yaml": "^2.8.2"
 	},
 	"packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
