@@ -36,7 +36,6 @@
 		"build": "yarn typescript-esbuild && tsc -p tsconfig.build.json",
 		"envbench": "node ./dist/cli.js",
 		"test": "tsx --test src/core/*.test.ts",
-		"publish": "yarn build && npm publish",
 		"lint": "eslint ."
 	},
 	"devDependencies": {
