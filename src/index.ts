@@ -18,6 +18,7 @@ export type {
 	ModifyEnvironmentOptions,
 } from './core/envbench'
 export { ENVBENCH_VERSION } from './core/version'
+export { getPortableName, getPortablePath } from './core/blockbench'
 export type { EnvbenchOptions } from './core/context'
 export {
 	getDefaultPortablesCache,

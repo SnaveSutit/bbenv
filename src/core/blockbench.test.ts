@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { platform, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import {
 	getInstalledVersions,
+	getPortableName,
+	getPortablePath,
 	parsePortableVersion,
 	pruneBlockbenchVersions,
 	resolveVersion,
@@ -22,6 +24,25 @@ describe('resolveVersion', () => {
 	it('throws OfflineError for latest/beta while offline', async () => {
 		await assert.rejects(resolveVersion(false, 'latest'), OfflineError)
 		await assert.rejects(resolveVersion(false, 'beta'), OfflineError)
+	})
+})
+
+describe('getPortableName / getPortablePath', () => {
+	const ext = { win32: 'exe', darwin: 'dmg' }[platform() as string] ?? 'AppImage'
+
+	it('names a portable for the current platform', () => {
+		assert.equal(getPortableName('5.1.6'), `blockbench-5.1.6.${ext}`)
+	})
+
+	it('round-trips through parsePortableVersion', () => {
+		assert.equal(parsePortableVersion(getPortableName('4.10.0')), '4.10.0')
+	})
+
+	it('joins the name onto the cache directory', () => {
+		assert.equal(
+			getPortablePath('/tmp/cache', '5.1.6'),
+			join('/tmp/cache', `blockbench-5.1.6.${ext}`)
+		)
 	})
 })
 

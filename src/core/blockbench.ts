@@ -38,18 +38,35 @@ export interface DownloadHooks {
 }
 
 /**
- * The download URL and cache file name for a Blockbench portable on the current
- * platform.
+ * The standardized cache file name for a Blockbench portable of `version` on the
+ * current platform, e.g. `blockbench-5.1.6.AppImage`. This is the name EnvBench
+ * downloads a portable to and launches it from; consumers that need to locate
+ * the executable themselves should build the path from this rather than
+ * hard-coding the convention.
  */
-function portableUrlAndName(version: ResolvedBlockbenchVersion): [url: string, fileName: string] {
+export function getPortableName(version: ResolvedBlockbenchVersion): string {
+	switch (platform()) {
+		case 'win32':
+			return `blockbench-${version}.exe`
+		case 'darwin':
+			return `blockbench-${version}.dmg`
+		case 'linux':
+			return `blockbench-${version}.AppImage`
+		default:
+			throw new UnsupportedPlatformError(platform())
+	}
+}
+
+/** The GitHub release download URL for a Blockbench portable on the current platform. */
+function portableDownloadUrl(version: ResolvedBlockbenchVersion): string {
 	const base = `http://github.com/JannisX11/blockbench/releases/download/v${version}`
 	switch (platform()) {
 		case 'win32':
-			return [`${base}/Blockbench_${version}_portable.exe`, `blockbench-${version}.exe`]
+			return `${base}/Blockbench_${version}_portable.exe`
 		case 'darwin':
-			return [`${base}/Blockbench_${version}.dmg`, `blockbench-${version}.dmg`]
+			return `${base}/Blockbench_${version}.dmg`
 		case 'linux':
-			return [`${base}/Blockbench_${version}.AppImage`, `blockbench-${version}.AppImage`]
+			return `${base}/Blockbench_${version}.AppImage`
 		default:
 			throw new UnsupportedPlatformError(platform())
 	}
@@ -61,8 +78,12 @@ export function parsePortableVersion(fileName: string): ResolvedBlockbenchVersio
 	return match ? (match[1] as ResolvedBlockbenchVersion) : undefined
 }
 
-function getPortablePath(portablesCache: string, version: ResolvedBlockbenchVersion): string {
-	return join(portablesCache, portableUrlAndName(version)[1])
+/** The absolute path a portable of `version` is cached at, inside `portablesCache`. */
+export function getPortablePath(
+	portablesCache: string,
+	version: ResolvedBlockbenchVersion
+): string {
+	return join(portablesCache, getPortableName(version))
 }
 
 async function getLinuxManifest(version: ResolvedBlockbenchVersion): Promise<{ sha512: string }> {
@@ -183,7 +204,7 @@ async function downloadPortable(
 			`Attempted to install Blockbench version ${version}, but it is already installed!`
 		)
 	}
-	const [url] = portableUrlAndName(version)
+	const url = portableDownloadUrl(version)
 
 	await mkdir(parse(target).dir, { recursive: true })
 	hooks.onDownloadStart?.(version)
