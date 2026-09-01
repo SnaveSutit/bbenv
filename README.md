@@ -62,3 +62,46 @@ envbench create my-environment
 ```bash
 envbench start my-environment
 ```
+
+# 📚 Using Envbench as a library
+
+Envbench also ships a programmatic API (ESM and CommonJS, with TypeScript types).
+Install it as a normal dependency and import the `Envbench` class:
+
+```bash
+npm i envbench
+```
+
+```ts
+import { Envbench, EnvironmentError } from 'envbench'
+
+// Defaults to ~/.envbench; pass storageDir to use somewhere else.
+const eb = new Envbench()
+
+await eb.createEnvironment('work', { blockbenchVersion: 'latest' })
+
+const environments = await eb.listEnvironments()
+
+// launch() resolves to the spawned Blockbench child process.
+const child = await eb.launch('work')
+child.on('exit', code => console.log('Blockbench closed', code))
+
+try {
+	await eb.getEnvironment('missing')
+} catch (err) {
+	if (err instanceof EnvironmentError) {
+		// The API throws typed errors instead of writing to the terminal or
+		// exiting the process.
+	}
+}
+```
+
+Download progress is reported through optional hooks:
+
+```ts
+await eb.installVersion('4.10.0', {
+	onDownloadStart: version => console.log('downloading', version),
+	onProgress: ({ percent }) => console.log(`${Math.round(percent * 100)}%`),
+	onDownloadComplete: version => console.log('done', version),
+})
+```

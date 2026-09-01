@@ -1,1 +1,1 @@
-alias envbench='node ./dist/envbench.js'
+alias envbench='node ./dist/cli.js'

@@ -2,7 +2,7 @@ import { default as chalk, chalkStderr } from 'chalk'
 import { Help } from 'commander'
 import stripAnsi from 'strip-ansi'
 import wrapAnsi from 'wrap-ansi'
-import { registerCommand } from '../commandRegistry'
+import { registerCommand } from './commandRegistry'
 
 export class EnvBenchHelp extends Help {
 	chalk = chalk

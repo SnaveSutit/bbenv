@@ -1,13 +1,8 @@
 import { terminal as $, Terminal } from 'terminal-kit'
+import { parseBlockbenchLaunchArgs, validateBlockbenchLaunchArgs } from '../../core/launchArgs'
 import { registerCommand } from '../commandRegistry'
-import {
-	environmentExists,
-	getEnvironmentFile,
-	getEnvironmentStates,
-	setEnvironmentFile,
-	validateBlockbenchLaunchArgs,
-} from '../environmentHandler'
-import { confirmPrompt, log, parseBlockbenchLaunchArgs } from '../util'
+import { confirmPrompt, log } from '../output'
+import { getEnvbench } from '../run'
 import { remove } from './delete'
 import { info } from './info'
 import { launch } from './launch'
@@ -45,11 +40,12 @@ const ACTIONS: Record<string, Action> = {
 	},
 	'Modify Blockbench Launch Arguments': {
 		async action(name: string) {
-			if (!(await environmentExists(name))) {
+			const eb = getEnvbench()
+			if ((await eb.environmentExists(name)) === false) {
 				log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 				process.exit(1)
 			}
-			const environment = await getEnvironmentFile(name)
+			const environment = await eb.getEnvironment(name)
 
 			const stringArgs = environment.launchArgs ? environment.launchArgs.join(' ') : ''
 
@@ -89,8 +85,7 @@ const ACTIONS: Record<string, Action> = {
 				process.exit(0)
 			}
 
-			environment.launchArgs = newArgs
-			await setEnvironmentFile(name, environment)
+			await eb.modifyEnvironment(name, { launchArgs: newArgs })
 
 			log().green(`Launch arguments for `).cyan(name).green(` updated successfully!\n`)
 		},
@@ -103,18 +98,18 @@ const ACTIONS: Record<string, Action> = {
 }
 
 export async function menu() {
-	const environments = await getEnvironmentStates()
-	const length = Object.keys(environments).length
-	if (length === 0) {
+	const environments = await getEnvbench().listEnvironments()
+	const names = Object.keys(environments)
+	if (names.length === 0) {
 		log().red('No environments found!\n')
-		log().yellow('Create a new environment with the "--create <name>" command.\n')
+		log().yellow('Create a new environment with the "create <name>" command.\n')
 		process.exit(1)
 	}
 	log().green(
 		'Select an environment: (Use arrow keys to navigate, ENTER to select, ESC to cancel.)'
 	)
 	let response: Terminal.SingleLineMenuResponse
-	response = await $.singleColumnMenu(Object.keys(environments), {
+	response = await $.singleColumnMenu(names, {
 		cancelable: true,
 		leftPadding: '- ',
 		style: $.green,

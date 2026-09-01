@@ -1,18 +1,19 @@
 import { terminal as $ } from 'terminal-kit'
 import { registerCommand } from '../commandRegistry'
-import { environmentExists, getEnvironmentFile } from '../environmentHandler'
-import { log } from '../util'
+import { log } from '../output'
+import { getEnvbench } from '../run'
 
 export async function info(name: string) {
-	if (!(await environmentExists(name))) {
+	const eb = getEnvbench()
+	if ((await eb.environmentExists(name)) === false) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 		process.exit(1)
 	}
-	const environment = await getEnvironmentFile(name)
+	const environment = await eb.getEnvironment(name)
 	log().green(`Information about environment `).cyan(name).green(`:\n`)
 	$.gray('├ ').green(`Name: `).cyan(name).green(`\n`)
 	$.gray('├ ').green(`Blockbench version: `).cyan(environment.blockbench_version).green(`\n`)
-	if (environment.launchArgs) {
+	if (environment.launchArgs && environment.launchArgs.length > 0) {
 		$.gray('├ ').green(`Launch arguments: `).cyan(environment.launchArgs.join(' ')).green(`\n`)
 	} else {
 		$.gray('├ ').green(`Launch arguments: `).cyan('none').red(`\n`)

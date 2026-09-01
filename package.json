@@ -1,7 +1,7 @@
 {
 	"name": "envbench",
 	"description": "Envbench allows the creation and management of multiple unique Blockbench environments.",
-	"version": "3.2.0",
+	"version": "3.2.1",
 	"author": {
 		"name": "Titus Evans (SnaveSutit)",
 		"email": "snavesutit@gmail.com",
@@ -12,25 +12,38 @@
 		"url": "https://github.com/SnaveSutit/envbench"
 	},
 	"type": "commonjs",
-	"bin": "./dist/envbench.js",
+	"bin": {
+		"envbench": "./dist/cli.js"
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		},
+		"./cli": "./dist/cli.js",
+		"./package.json": "./package.json"
+	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
 		"typescript-esbuild": "tsx ./.scripts/esbuild.ts",
 		"dev": "node-modules-vscode-problems-patch && yarn typescript-esbuild --dev",
-		"build": "yarn typescript-esbuild",
-		"envbench": "node ./dist/envbench.js",
+		"build": "yarn typescript-esbuild && tsc -p tsconfig.build.json",
+		"envbench": "node ./dist/cli.js",
+		"test": "tsx --test src/core/*.test.ts",
 		"publish": "yarn build && npm publish",
 		"lint": "eslint ."
 	},
 	"devDependencies": {
-		"@types/got": "^9.6.12",
 		"@types/node": "^22.5.5",
-		"compare-versions": "^6.1.1",
+		"@types/terminal-kit": "^2.5.6",
 		"esbuild-plugin-import-glob": "^0.1.1",
 		"eslint": "^9.20.0",
-		"got": "^14.6.6",
 		"jiti": "^2.4.2",
 		"node-modules-vscode-problems-patch": "^1.0.9",
 		"tsx": "^4.19.3",
@@ -38,9 +51,9 @@
 		"typescript-eslint": "^8.23.0"
 	},
 	"dependencies": {
-		"@types/terminal-kit": "^2.5.6",
 		"chalk": "^5.4.1",
 		"commander": "^13.1.0",
+		"compare-versions": "^6.1.1",
 		"strip-ansi": "^7.1.0",
 		"terminal-kit": "^3.1.1",
 		"wrap-ansi": "^9.0.0",

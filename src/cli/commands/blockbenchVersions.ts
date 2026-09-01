@@ -1,23 +1,21 @@
-import { readdir } from 'fs/promises'
-import { pruneBlockbenchVersions, ResolvedBlockbenchVersion } from '../blockbenchVersionManager'
 import { registerCommand } from '../commandRegistry'
-import { log } from '../util'
-
-type PortableFileName = `blockbench-${ResolvedBlockbenchVersion}.${'exe' | 'dmg' | 'AppImage'}`
+import { log } from '../output'
+import { getEnvbench } from '../run'
 
 export async function blockbenchVersions(options: { prune?: true }) {
+	const eb = getEnvbench()
+
 	if (options.prune) {
 		log().green(`Pruning Blockbench versions...\n`)
-		await pruneBlockbenchVersions()
+		const removed = await eb.pruneVersions()
+		for (const version of removed) {
+			log().red(`Removed Blockbench version `).cyan(version).red(`\n`)
+		}
 	}
 
 	log().green(`Installed Blockbench versions:\n`)
-	const portableFiles = (await readdir(
-		process.env.BLOCKBENCH_PORTABLES_CACHE
-	)) as PortableFileName[]
-	for (const portable of portableFiles) {
-		const version = portable.replace(/^blockbench(?:-|_)|\.exe|\.dmg|\.AppImage$/gi, '')
-		log().cyan(version).green(` (${portable})\n`)
+	for (const version of await eb.listInstalledVersions()) {
+		log().cyan(version).green(`\n`)
 	}
 }
 

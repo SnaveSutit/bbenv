@@ -1,14 +1,8 @@
-import { NamedBlockbenchVersion } from '../blockbenchVersionManager'
-import {
-	environmentExists,
-	getEnvironmentFile,
-	setEnvironmentFile,
-	validateBlockbenchLaunchArgs,
-} from '../environmentHandler'
-import { confirmPrompt, log } from '../util'
-
+import { parseBlockbenchLaunchArgs } from '../../core/launchArgs'
+import type { NamedBlockbenchVersion } from '../../core/types'
 import { registerCommand } from '../commandRegistry'
-import { rename } from './rename'
+import { confirmPrompt, log } from '../output'
+import { getEnvbench } from '../run'
 
 export async function modify(
 	name: string,
@@ -24,7 +18,8 @@ export async function modify(
 		process.exit(1)
 	}
 
-	if (!(await environmentExists(name))) {
+	const eb = getEnvbench()
+	if ((await eb.environmentExists(name)) === false) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 		process.exit(1)
 	}
@@ -51,36 +46,15 @@ export async function modify(
 	}
 
 	log().green(`Modifying Environment `).cyan(name).green(`...\n`)
-	const envFile = await getEnvironmentFile(name)
-
-	if (options.launchArgs !== undefined) {
-		log()
-			.green(`Setting launch arguments for `)
-			.cyan(name)
-			.green(` to `)
-			.cyan(options.launchArgs)
-			.green(`...\n`)
-		const args = options.launchArgs.split(' ')
-		validateBlockbenchLaunchArgs(args)
-		envFile.launchArgs = args
-	}
-
-	if (options.version !== undefined) {
-		log()
-			.green(`Setting Blockbench version for `)
-			.cyan(name)
-			.green(` to `)
-			.cyan(options.version)
-			.green(`...\n`)
-		envFile.blockbench_version = options.version
-	}
-
-	await setEnvironmentFile(name, envFile)
+	await eb.modifyEnvironment(name, {
+		launchArgs:
+			options.launchArgs !== undefined
+				? parseBlockbenchLaunchArgs(options.launchArgs)
+				: undefined,
+		blockbenchVersion: options.version,
+		rename: options.rename,
+	})
 	log().green(`Environment `).cyan(name).green(` modified successfully!\n`)
-
-	if (options.rename !== undefined) {
-		await rename(name, options.rename, { confirm: true })
-	}
 
 	process.exit(0)
 }

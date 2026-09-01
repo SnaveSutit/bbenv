@@ -96,19 +96,16 @@ function createHeader() {
 	}
 }
 
-const DEFINES: Record<string, string> = {}
+const DEFINES: Record<string, string> = {
+	ENVBENCH_INJECTED_VERSION: JSON.stringify(PACKAGE.version),
+}
 
 Object.entries(process.env).forEach(([key, value]) => {
 	if (/[^A-Za-z0-9_]/i.exec(key)) return
 	DEFINES[`process.env.${key}`] = JSON.stringify(value)
 })
 
-const DEFAULT_BUILD_OPTIONS: ESBuild.BuildOptions = {
-	get banner() {
-		return createHeader()
-	},
-	entryPoints: ['./src/index.ts'],
-	outfile: `./dist/${PACKAGE.name as string}.js`,
+const SHARED_OPTIONS: ESBuild.BuildOptions = {
 	bundle: true,
 	minify: false,
 	sourcemap: 'inline',
@@ -118,25 +115,60 @@ const DEFAULT_BUILD_OPTIONS: ESBuild.BuildOptions = {
 		'.ttf': 'binary',
 		'': 'text', // Fix for terminal-kit's README being loaded as JavaScript
 	},
-	plugins: [INFO_PLUGIN, ImportFolder()],
 	define: DEFINES,
-	external: ['terminal-kit'],
 	treeShaking: true,
 }
 
+/** The single-file CLI bundle, with a shebang + banner. */
+const CLI_BUILD_OPTIONS: ESBuild.BuildOptions = {
+	...SHARED_OPTIONS,
+	get banner() {
+		return createHeader()
+	},
+	entryPoints: ['./src/cli/index.ts'],
+	outfile: './dist/cli.js',
+	plugins: [INFO_PLUGIN, ImportFolder()],
+	external: ['terminal-kit'],
+}
+
+/**
+ * The library entry, emitted as both CommonJS and ESM. Dependencies stay
+ * external - `compare-versions` and `yaml` both ship CJS and ESM builds, so
+ * consumers resolve the right one for their format.
+ */
+const LIBRARY_BUILD_OPTIONS: ESBuild.BuildOptions = {
+	...SHARED_OPTIONS,
+	entryPoints: ['./src/index.ts'],
+	packages: 'external',
+	sourcemap: true,
+	plugins: [INFO_PLUGIN],
+}
+
 async function buildDev() {
-	const ctx = await ESBuild.context({ ...DEFAULT_BUILD_OPTIONS })
+	const ctx = await ESBuild.context(CLI_BUILD_OPTIONS)
 	await ctx.watch()
 }
 
-function buildProd() {
-	ESBuild.build({
-		...DEFAULT_BUILD_OPTIONS,
+async function buildProd() {
+	const prod = <T extends ESBuild.BuildOptions>(options: T): T => ({
+		...options,
 		minify: true,
 		// Disabling this will reduce file size, but make bugs much harder to track down.
 		keepNames: true,
 		drop: ['debugger'],
-	}).catch(() => process.exit(1))
+	})
+
+	try {
+		await Promise.all([
+			ESBuild.build(prod(CLI_BUILD_OPTIONS)),
+			ESBuild.build(prod({ ...LIBRARY_BUILD_OPTIONS, format: 'cjs', outfile: './dist/index.js' })),
+			ESBuild.build(
+				prod({ ...LIBRARY_BUILD_OPTIONS, format: 'esm', outfile: './dist/index.mjs' })
+			),
+		])
+	} catch {
+		process.exit(1)
+	}
 }
 
 async function main() {
@@ -144,7 +176,7 @@ async function main() {
 		await buildDev()
 		return
 	}
-	buildProd()
+	await buildProd()
 }
 
 void main()

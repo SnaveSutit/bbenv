@@ -1,9 +1,10 @@
 import { registerCommand } from '../commandRegistry'
-import { environmentExists, removeEnvironment } from '../environmentHandler'
-import { confirmPrompt, log } from '../util'
+import { confirmPrompt, log } from '../output'
+import { getEnvbench } from '../run'
 
 export async function remove(name: string, options: { confirm?: true }) {
-	if (!(await environmentExists(name))) {
+	const eb = getEnvbench()
+	if ((await eb.environmentExists(name)) === false) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 		process.exit(1)
 	}
@@ -15,7 +16,7 @@ export async function remove(name: string, options: { confirm?: true }) {
 		}
 	}
 	log().green(`Deleting environment `).cyan(name).green(`...\n`)
-	await removeEnvironment(name)
+	await eb.deleteEnvironment(name)
 	log().green(`Environment deleted successfully!\n`)
 }
 

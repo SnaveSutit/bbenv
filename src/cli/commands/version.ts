@@ -1,6 +1,6 @@
-import { version } from '../../package.json'
+import { ENVBENCH_VERSION } from '../../core/version'
 import { registerCommand } from '../commandRegistry'
-import { log } from '../util'
+import { log } from '../output'
 
 registerCommand(program => {
 	program
@@ -8,6 +8,6 @@ registerCommand(program => {
 		.alias('v')
 		.description('Print the version of EnvBench.')
 		.action(() => {
-			log().green('v', version, '\n')
+			log().green('v', ENVBENCH_VERSION, '\n')
 		})
 })

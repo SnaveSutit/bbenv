@@ -1,13 +1,7 @@
-import { rename as fsRename } from 'fs/promises'
-import { join } from 'path'
 import { registerCommand } from '../commandRegistry'
-import {
-	environmentExists,
-	getEnvironmentFile,
-	setEnvironmentFile,
-	validateEnvironmentName,
-} from '../environmentHandler'
-import { confirmPrompt, log } from '../util'
+import { validateEnvironmentName } from '../../core/environments'
+import { confirmPrompt, log } from '../output'
+import { getEnvbench } from '../run'
 
 export async function rename(name: string, newName: string, options: { confirm?: true }) {
 	if (name === newName) {
@@ -16,11 +10,12 @@ export async function rename(name: string, newName: string, options: { confirm?:
 	}
 
 	validateEnvironmentName(newName)
-	if (!(await environmentExists(name))) {
+	const eb = getEnvbench()
+	if ((await eb.environmentExists(name)) === false) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 		process.exit(1)
 	}
-	if (await environmentExists(newName)) {
+	if ((await eb.environmentExists(newName)) !== false) {
 		log().red(`Environment `).cyan(newName).red(` already exists!\n`)
 		process.exit(1)
 	}
@@ -37,16 +32,7 @@ export async function rename(name: string, newName: string, options: { confirm?:
 		}
 	}
 	log().green(`Renaming environment `).cyan(name).green(` to `).cyan(newName).green(`...\n`)
-	const oldPath = join(process.env.ENVBENCH_STORAGE_FOLDER, name)
-	const newPath = join(process.env.ENVBENCH_STORAGE_FOLDER, newName)
-	await fsRename(oldPath, newPath).catch(err => {
-		log().red(`Failed to rename environment:\n`)
-		log().error(err)
-		process.exit(1)
-	})
-	const envFile = await getEnvironmentFile(newName)
-	envFile.name = newName
-	await setEnvironmentFile(newName, envFile)
+	await eb.renameEnvironment(name, newName)
 	log().green(`Environment renamed successfully!\n`)
 }
 

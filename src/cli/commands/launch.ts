@@ -1,27 +1,25 @@
-import { launchBlockbench } from '../blockbenchVersionManager'
 import { registerCommand } from '../commandRegistry'
-import {
-	environmentExists,
-	getEnvironmentFile,
-	validateBlockbenchLaunchArgs,
-} from '../environmentHandler'
-import { log } from '../util'
+import { parseBlockbenchLaunchArgs } from '../../core/launchArgs'
+import { downloadProgressHooks, log } from '../output'
+import { getEnvbench, runToExit } from '../run'
 
 /**
  * Start an environment.
  */
 export async function launch(name: string, options?: { launchArgs?: string }) {
-	if (!(await environmentExists(name, false))) {
+	const eb = getEnvbench()
+	if ((await eb.environmentExists(name)) === false) {
 		log().red(`Environment `).cyan(name).red(` does not exist!\n`)
 		process.exit(1)
 	}
 
-	const envFile = await getEnvironmentFile(name)
-	const args = [...(envFile.launchArgs ?? []), ...(options?.launchArgs?.split(' ') ?? [])]
-	validateBlockbenchLaunchArgs(args)
-
 	log().green(`Launching environment `).cyan(name).green(`...\n`)
-	await launchBlockbench(envFile.blockbench_version, name, args)
+	const child = await eb.launch(
+		name,
+		{ extraArgs: parseBlockbenchLaunchArgs(options?.launchArgs ?? '') },
+		downloadProgressHooks()
+	)
+	await runToExit(child)
 }
 
 registerCommand(program => {

@@ -122,12 +122,6 @@ const CUSTOM_RULES: ConfigWithExtends['rules'] = {
 			format: ['camelCase'],
 		},
 		{ selector: 'interface', format: ['PascalCase'] },
-		{
-			selector: 'interface',
-			modifiers: ['exported'],
-			format: ['PascalCase'],
-			prefix: ['I'],
-		},
 		{ selector: 'typeLike', format: ['PascalCase'] },
 		{ selector: 'objectLiteralProperty', format: null },
 		{ selector: 'default', format: ['camelCase'] },
@@ -182,6 +176,13 @@ export default tsESLint.config(
 		},
 		linterOptions: {
 			reportUnusedDisableDirectives: true,
+		},
+	},
+	{
+		// `node:test`'s describe/it return promises that are meant to be ignored.
+		files: ['**/*.test.ts'],
+		rules: {
+			'@typescript-eslint/no-floating-promises': 'off',
 		},
 	}
 )
