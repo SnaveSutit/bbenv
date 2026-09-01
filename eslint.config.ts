@@ -14,7 +14,9 @@ const IGNORE_PATTERNS = [
 	// Blockbench Plugin Template
 	'dist/**/*',
 
-	// Ignore files for PNPM, NPM and YARN
+	// Ignore lockfiles for Bun, PNPM, NPM and YARN
+	'bun.lock',
+	'bun.lockb',
 	'pnpm-lock.yaml',
 	'package-lock.json',
 	'yarn.lock',
@@ -159,19 +161,12 @@ export default tsESLint.config(
 		languageOptions: {
 			parser: tsESLint.parser,
 			parserOptions: {
-				project: './tsconfig.json',
+				projectService: true,
+				tsconfigRootDir: __dirname,
 			},
 			globals: {
 				browser: true,
 				node: true,
-			},
-		},
-	},
-	{
-		languageOptions: {
-			parserOptions: {
-				projectService: true,
-				tsconfigRootDir: __dirname,
 			},
 		},
 		linterOptions: {

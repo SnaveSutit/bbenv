@@ -1,4 +1,4 @@
-import type { Plugin } from 'esbuild'
+import type { BunPlugin } from 'bun'
 import * as fs from 'fs'
 import * as pathjs from 'path'
 
@@ -16,7 +16,7 @@ interface IRecursiveDirEntry {
 }
 
 interface IRecursiveReadDirSyncOptions {
-	encoding?: fs.ObjectEncodingOptions['encoding']
+	encoding?: BufferEncoding
 	maxDepth?: number
 	filter?: (file: IRecursiveDirEntry) => boolean
 }
@@ -75,74 +75,65 @@ function normalizePathToPosix(path: string) {
 	return path.replaceAll(pathjs.sep, pathjs.posix.sep)
 }
 
+const NAMESPACE = 'import-folder'
+
 /**
  * A plugin for importing all files in a folder without manually updating an index file.
  * To recurse into subdirectories, use the `//` suffix.
  *
- * NOTE - If you're using a glob plugin, this plugin should be executed first.
+ * A single `/` suffix imports only the folder's direct children. If the folder
+ * contains an `index.ts`, that file is imported and the rest of the folder is
+ * ignored.
  */
-const plugin = (): Plugin => {
+const plugin = (): BunPlugin => {
 	return {
-		name: 'import-folder',
-		setup: build => {
-			build.onResolve({ filter: /.+\/\/?$/, namespace: 'file' }, args => {
-				const fullPath = normalizePathToPosix(pathjs.join(args.resolveDir, args.path))
+		name: NAMESPACE,
+		setup(build) {
+			build.onResolve({ filter: /.+\/\/?$/ }, args => {
+				const resolveDir = args.importer ? pathjs.dirname(args.importer) : process.cwd()
+				const fullPath = normalizePathToPosix(pathjs.resolve(resolveDir, args.path))
 
-				const stat = fs.statSync(fullPath)
-				if (!stat.isDirectory()) {
-					return {
-						errors: [
-							{
-								text: `"${fullPath}" is not a directory, but is being imported with a "/" suffix.`,
-								location: { file: args.importer },
-							},
-						],
-					}
+				if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+					throw new Error(
+						`"${fullPath}" is not a directory, but is being imported with a "/" suffix (from ${args.importer}).`
+					)
 				}
 
 				return {
-					namespace: 'import-folder',
+					// The trailing slashes are stripped so the path resolves to a real
+					// directory; the recursion depth is encoded in the namespace.
 					path: fullPath,
-					pluginData: { recursive: args.path.endsWith('//'), importer: args.importer },
+					namespace: args.path.endsWith('//') ? `${NAMESPACE}-recursive` : NAMESPACE,
 				}
 			})
 
-			build.onLoad({ filter: /.+\/\/?$/, namespace: 'import-folder' }, args => {
-				let files: IRecursiveDirEntry[]
+			for (const namespace of [NAMESPACE, `${NAMESPACE}-recursive`]) {
+				const recursive = namespace.endsWith('-recursive')
 
-				const filter: IRecursiveReadDirSyncOptions['filter'] = file => {
-					return file.ext === '.js' || file.ext === '.ts'
-				}
+				build.onLoad({ filter: /.*/, namespace }, args => {
+					const filter: IRecursiveReadDirSyncOptions['filter'] = file =>
+						file.ext === '.js' || file.ext === '.ts'
 
-				if (args.pluginData.recursive) {
-					files = recursiveReadDirSync(args.path, { encoding: 'utf-8', filter })
-				} else {
-					files = recursiveReadDirSync(args.path, {
+					const files = recursiveReadDirSync(args.path, {
 						encoding: 'utf-8',
 						filter,
-						maxDepth: 0,
+						maxDepth: recursive ? undefined : 0,
 					})
-				}
 
-				const contents = files
-					.map(file => `import './${normalizePathToPosix(file.localPath)}';`)
-					.join('\n')
+					// Absolute specifiers so the generated module needs no resolve dir.
+					const contents = files
+						.map(file => `import '${normalizePathToPosix(file.path)}';`)
+						.join('\n')
 
-				console.log(
-					`📃 ${normalizePathToPosix(
-						pathjs.relative(process.cwd(), args.pluginData.importer)
-					)} imports folder ${normalizePathToPosix(
-						pathjs.relative(process.cwd(), args.path)
-					)}${args.pluginData.recursive ? ' recursively' : ''}.`
-				)
+					console.log(
+						`📃 imports folder ${normalizePathToPosix(
+							pathjs.relative(process.cwd(), args.path)
+						)}${recursive ? ' recursively' : ''}.`
+					)
 
-				return {
-					loader: 'js',
-					contents,
-					watchFiles: files.map(file => pathjs.join(file.parentPath, file.name)),
-					resolveDir: args.path,
-				}
-			})
+					return { loader: 'js', contents }
+				})
+			}
 		},
 	}
 }
